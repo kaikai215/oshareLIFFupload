@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Oshare批發｜上傳合約與證件</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    :root {
+      --bg: #ded2c6;
+      --card: #fff;
+      --text: #674b39;
+      --muted: #7a6b5c;
+      --btn: #d8ccbe;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px 20px 40px;
+    }
+    .card {
+      max-width: 420px;
+      margin: 0 auto;
+      background: var(--card);
+      border-radius: 16px;
+      padding: 24px 20px;
+      box-shadow: 0 8px 24px rgba(103, 75, 57, 0.12);
+    }
+    h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    .sub {
+      margin: 0 0 20px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin: -2px 0 8px;
+    }
+    input[type="file"] {
+      width: 100%;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+    .preview {
+      width: 100%;
+      max-height: 140px;
+      object-fit: contain;
+      border-radius: 8px;
+      margin: -8px 0 14px;
+      background: #f5f0ea;
+      display: none;
+    }
+    .meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+      word-break: break-all;
+    }
+    button {
+      width: 100%;
+      border: none;
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      background: var(--btn);
+      color: var(--text);
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .msg {
+      margin-top: 14px;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .msg.ok { color: #1b7a3d; }
+    .msg.err { color: #b00020; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 id="title">上傳合約與證件</h1>
+    <p class="sub" id="subText">請上傳已簽名的合約書，以及身分證正反面。檔案會存入審核資料，僅供批發申請使用。</p>
+    <div class="meta" id="statusLine">正在連接 LINE…</div>
+
+    <div id="uploadForm" class="hidden">
+      <label for="contract">合約書（PDF 或照片）</label>
+      <p class="hint">建議 PDF；亦可拍照上傳</p>
+      <input id="contract" type="file" accept="image/*,application/pdf" />
+      <img id="contractPreview" class="preview" alt="" />
+
+      <label for="idFront">身分證正面</label>
+      <input id="idFront" type="file" accept="image/*" />
+      <img id="idFrontPreview" class="preview" alt="" />
+
+      <label for="idBack">身分證反面</label>
+      <input id="idBack" type="file" accept="image/*" />
+      <img id="idBackPreview" class="preview" alt="" />
+
+      <button id="submitBtn" type="button">確認上傳</button>
+    </div>
+
+    <div class="msg" id="message"></div>
+    <button id="closeBtn" type="button" class="hidden" style="margin-top: 12px;">關閉並返回對話</button>
+  </div>
+
+  <script>
+    // 請在 LINE Developers 新增一個 LIFF，Endpoint 指到此頁網址，並填入 LIFF ID
+    const LIFF_ID = "2012259104-vC0Ppjbm";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyX0Aqq39sml4dIoYl3q9hsR_-SHkH-7wBQe_E3m-3XgMGAaFqpUu2KyT3IEXrnveEe0w/exec";
+    const SECRET_TOKEN = "oshare-reg-2026-k9m2x7";
+    const MAX_IMAGE_EDGE = 1600;
+    const JPEG_QUALITY = 0.82;
+
+    const statusLine = document.getElementById("statusLine");
+    const messageEl = document.getElementById("message");
+    const uploadForm = document.getElementById("uploadForm");
+    const submitBtn = document.getElementById("submitBtn");
+    const closeBtn = document.getElementById("closeBtn");
+    const titleEl = document.getElementById("title");
+    const subText = document.getElementById("subText");
+    const contractInput = document.getElementById("contract");
+    const idFrontInput = document.getElementById("idFront");
+    const idBackInput = document.getElementById("idBack");
+
+    let lineUserId = "";
+
+    function setMessage(text, type) {
+      messageEl.textContent = text || "";
+      messageEl.className = "msg" + (type ? " " + type : "");
+    }
+
+    async function postAction(payload) {
+      const res = await fetch(WEB_APP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+        redirect: "follow",
+      });
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch (_) {
+        throw new Error("伺服器回應異常。");
+      }
+    }
+
+    function readFileAsDataURL(file) {
+      return new Promise(function (resolve, reject) {
+        const reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function loadImage(dataUrl) {
+      return new Promise(function (resolve, reject) {
+        const img = new Image();
+        img.onload = function () { resolve(img); };
+        img.onerror = reject;
+        img.src = dataUrl;
+      });
+    }
+
+    async function fileToPayload(file, prefix) {
+      if (!file) return null;
+      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name || "");
+      if (isPdf) {
+        if (file.size > 8 * 1024 * 1024) {
+          throw new Error("PDF 請小於 8MB。");
+        }
+        const dataUrl = await readFileAsDataURL(file);
+        const base64 = String(dataUrl).split(",")[1] || "";
+        return {
+          base64: base64,
+          mimeType: "application/pdf",
+          fileName: prefix + ".pdf",
+        };
+      }
+
+      const dataUrl = await readFileAsDataURL(file);
+      const img = await loadImage(dataUrl);
+      let w = img.width;
+      let h = img.height;
+      const maxEdge = Math.max(w, h);
+      if (maxEdge > MAX_IMAGE_EDGE) {
+        const r = MAX_IMAGE_EDGE / maxEdge;
+        w = Math.round(w * r);
+        h = Math.round(h * r);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      const jpegUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+      const base64 = jpegUrl.split(",")[1] || "";
+      return {
+        base64: base64,
+        mimeType: "image/jpeg",
+        fileName: prefix + ".jpg",
+      };
+    }
+
+    function bindPreview(input, imgEl) {
+      input.addEventListener("change", function () {
+        const file = input.files && input.files[0];
+        if (!file || !String(file.type || "").startsWith("image/")) {
+          imgEl.style.display = "none";
+          imgEl.removeAttribute("src");
+          return;
+        }
+        const url = URL.createObjectURL(file);
+        imgEl.src = url;
+        imgEl.style.display = "block";
+      });
+    }
+
+    bindPreview(contractInput, document.getElementById("contractPreview"));
+    bindPreview(idFrontInput, document.getElementById("idFrontPreview"));
+    bindPreview(idBackInput, document.getElementById("idBackPreview"));
+
+    function showNeedBind() {
+      titleEl.textContent = "尚未綁定";
+      subText.textContent = "請先完成 LINE 綁定後，再回來上傳合約與證件。";
+      uploadForm.classList.add("hidden");
+      statusLine.textContent = "未綁定";
+      setMessage("請先至綁定頁完成手機綁定。", "err");
+      closeBtn.classList.remove("hidden");
+    }
+
+    function showUploadReady(phone) {
+      uploadForm.classList.remove("hidden");
+      statusLine.textContent = phone ? ("已綁定手機：" + phone) : "已確認綁定";
+      setMessage("", "");
+    }
+
+    function showUploadSuccess() {
+      titleEl.textContent = "上傳成功";
+      subText.textContent = "合約與證件已送出，我們將繼續審核。";
+      uploadForm.classList.add("hidden");
+      setMessage("狀態：已上傳", "ok");
+      closeBtn.classList.remove("hidden");
+      setTimeout(function () {
+        if (typeof liff !== "undefined" && liff.isInClient()) liff.closeWindow();
+      }, 1800);
+    }
+
+    async function initLiff() {
+      try {
+        if (!LIFF_ID || LIFF_ID.indexOf("請填入") === 0) {
+          statusLine.textContent = "尚未設定 LIFF ID";
+          setMessage("請先在 LINE Developers 建立上傳用 LIFF，並把 LIFF_ID 填進此頁。", "err");
+          return;
+        }
+
+        await liff.init({ liffId: LIFF_ID });
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+
+        const profile = await liff.getProfile();
+        lineUserId = profile.userId || "";
+        if (!lineUserId) {
+          statusLine.textContent = "無法取得 LINE 身分";
+          setMessage("請用 LINE App 開啟此頁。", "err");
+          return;
+        }
+
+        statusLine.textContent = "檢查綁定狀態…";
+        const data = await postAction({
+          action: "lookupLine",
+          token: SECRET_TOKEN,
+          lineUserId: lineUserId,
+        });
+
+        if (!(data.ok && data.bound)) {
+          showNeedBind();
+          return;
+        }
+
+        showUploadReady(data.phone || "");
+      } catch (err) {
+        statusLine.textContent = "LINE 連接失敗";
+        setMessage(String(err && err.message ? err.message : err), "err");
+      }
+    }
+
+    async function submitUpload() {
+      setMessage("");
+      const contractFile = contractInput.files && contractInput.files[0];
+      const frontFile = idFrontInput.files && idFrontInput.files[0];
+      const backFile = idBackInput.files && idBackInput.files[0];
+
+      if (!contractFile) {
+        setMessage("請上傳合約書。", "err");
+        return;
+      }
+      if (!frontFile) {
+        setMessage("請上傳身分證正面。", "err");
+        return;
+      }
+      if (!backFile) {
+        setMessage("請上傳身分證反面。", "err");
+        return;
+      }
+      if (!lineUserId) {
+        setMessage("尚未取得 LINE 身分。", "err");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "上傳中…";
+
+      try {
+        const contract = await fileToPayload(contractFile, "合約書");
+        const idFront = await fileToPayload(frontFile, "身分證正面");
+        const idBack = await fileToPayload(backFile, "身分證反面");
+
+        const data = await postAction({
+          action: "uploadDocs",
+          token: SECRET_TOKEN,
+          lineUserId: lineUserId,
+          contractImages: contract ? [contract] : [],
+          idFrontImages: idFront ? [idFront] : [],
+          idBackImages: idBack ? [idBack] : [],
+        });
+
+        if (data.ok) {
+          showUploadSuccess();
+          return;
+        }
+
+        if (data.error === "not_bound") {
+          showNeedBind();
+        } else if (data.error === "unauthorized") {
+          setMessage("驗證失敗，請聯繫管理員。", "err");
+        } else {
+          setMessage("上傳失敗：" + (data.error || "未知錯誤"), "err");
+        }
+        submitBtn.disabled = false;
+        submitBtn.textContent = "確認上傳";
+      } catch (err) {
+        setMessage(String(err && err.message ? err.message : err), "err");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "確認上傳";
+      }
+    }
+
+    closeBtn.addEventListener("click", function () {
+      if (typeof liff !== "undefined" && liff.isInClient()) {
+        liff.closeWindow();
+      }
+    });
+    submitBtn.addEventListener("click", submitUpload);
+    initLiff();
+  </script>
+</body>
+</html>
