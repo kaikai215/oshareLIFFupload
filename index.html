@@ -94,14 +94,14 @@
 <body>
   <div class="card">
     <h1 id="title">上傳合約與證件</h1>
-    <p class="sub" id="subText">請上傳已簽名的合約書，以及身分證正反面。檔案會存入審核資料，僅供批發申請使用。</p>
+    <p class="sub" id="subText">請上傳已簽名的合約書，以及身分證正反面。未滿 18 歲請一併上傳法定代理人同意書。檔案僅供批發申請審核使用。</p>
     <div class="meta" id="statusLine">正在連接 LINE…</div>
 
     <div id="uploadForm" class="hidden">
-      <label for="contract">合約書（PDF 或照片）</label>
-      <p class="hint">建議 PDF；亦可拍照上傳</p>
-      <input id="contract" type="file" accept="image/*,application/pdf" />
-      <img id="contractPreview" class="preview" alt="" />
+      <label for="contract">合約／同意書（最多 3 個檔）</label>
+      <p class="hint">可多選；建議 PDF。未滿 18 歲請加上「未成年合作法定代理人同意書」</p>
+      <input id="contract" type="file" accept="image/*,application/pdf" multiple />
+      <p class="hint" id="contractFileList"></p>
 
       <label for="idFront">身分證正面</label>
       <input id="idFront" type="file" accept="image/*" />
@@ -125,6 +125,7 @@
     const SECRET_TOKEN = "oshare-reg-2026-k9m2x7";
     const MAX_IMAGE_EDGE = 1600;
     const JPEG_QUALITY = 0.82;
+    const MAX_CONTRACT_FILES = 3;
 
     const statusLine = document.getElementById("statusLine");
     const messageEl = document.getElementById("message");
@@ -231,7 +232,21 @@
       });
     }
 
-    bindPreview(contractInput, document.getElementById("contractPreview"));
+    const contractFileList = document.getElementById("contractFileList");
+    contractInput.addEventListener("change", function () {
+      const files = Array.prototype.slice.call(contractInput.files || []);
+      if (files.length > MAX_CONTRACT_FILES) {
+        setMessage("合約／同意書最多上傳 " + MAX_CONTRACT_FILES + " 個檔案。", "err");
+        contractInput.value = "";
+        contractFileList.textContent = "";
+        return;
+      }
+      setMessage("", "");
+      contractFileList.textContent = files.length
+        ? ("已選 " + files.length + " 個：" + files.map(function (f) { return f.name; }).join("、"))
+        : "";
+    });
+
     bindPreview(idFrontInput, document.getElementById("idFrontPreview"));
     bindPreview(idBackInput, document.getElementById("idBackPreview"));
 
@@ -304,12 +319,16 @@
 
     async function submitUpload() {
       setMessage("");
-      const contractFile = contractInput.files && contractInput.files[0];
+      const contractFiles = Array.prototype.slice.call(contractInput.files || [], 0, MAX_CONTRACT_FILES);
       const frontFile = idFrontInput.files && idFrontInput.files[0];
       const backFile = idBackInput.files && idBackInput.files[0];
 
-      if (!contractFile) {
-        setMessage("請上傳合約書。", "err");
+      if (!contractFiles.length) {
+        setMessage("請至少上傳 1 份合約書（未滿 18 歲請一併上傳同意書，最多 3 個檔）。", "err");
+        return;
+      }
+      if (contractFiles.length > MAX_CONTRACT_FILES) {
+        setMessage("合約／同意書最多上傳 " + MAX_CONTRACT_FILES + " 個檔案。", "err");
         return;
       }
       if (!frontFile) {
@@ -329,7 +348,11 @@
       submitBtn.textContent = "上傳中…";
 
       try {
-        const contract = await fileToPayload(contractFile, "合約書");
+        const contractImages = [];
+        for (var i = 0; i < contractFiles.length; i++) {
+          const payload = await fileToPayload(contractFiles[i], "合約_" + (i + 1));
+          if (payload) contractImages.push(payload);
+        }
         const idFront = await fileToPayload(frontFile, "身分證正面");
         const idBack = await fileToPayload(backFile, "身分證反面");
 
@@ -337,7 +360,7 @@
           action: "uploadDocs",
           token: SECRET_TOKEN,
           lineUserId: lineUserId,
-          contractImages: contract ? [contract] : [],
+          contractImages: contractImages,
           idFrontImages: idFront ? [idFront] : [],
           idBackImages: idBack ? [idBack] : [],
         });
