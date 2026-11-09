@@ -48,6 +48,7 @@
       font-size: 0.75rem;
       color: var(--muted);
       margin: -2px 0 8px;
+      line-height: 1.6;
     }
     .hint a {
       color: var(--link);
@@ -106,8 +107,9 @@
     <div id="uploadForm" class="hidden">
       <label for="contract">合約／同意書（最多 3 個檔）</label>
       <p class="hint">
-        <a href="https://drive.google.com/file/d/1NKykSBGkWMYxFBpQfA3T8BsSnCXziy81/view?usp=sharing" target="_blank" rel="noopener">點此下載/查看合約書</a>。<br>
-        未滿 18 歲請加上「未成年合作法定代理人同意書」
+        可多選；建議 PDF。<br>
+        • <a href="https://drive.google.com/file/d/1NKykSBGkWMYxFBpQfA3T8BsSnCXziy81/view?usp=sharing" target="_blank" rel="noopener">點此下載/查看合約書範本</a><br>
+        • <a href="https://drive.google.com/file/d/1ZpGVqVjBF5-zLEuXzjWmc_JfvY6XY9hd/view?usp=sharing" target="_blank" rel="noopener">點此下載未成年法定代理人同意書</a>（未滿 18 歲須檢附）
       </p>
       <input id="contract" type="file" accept="image/*,application/pdf" multiple />
       <p class="hint" id="contractFileList"></p>
