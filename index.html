@@ -12,7 +12,7 @@
       --text: #674b39;
       --muted: #7a6b5c;
       --btn: #d8ccbe;
-      --link: #8c5d3b; /* 新增連結顏色 */
+      --link: #8c5d3b;
     }
     * { box-sizing: border-box; }
     body {
@@ -105,9 +105,8 @@
 
     <div id="uploadForm" class="hidden">
       <label for="contract">合約／同意書（最多 3 個檔）</label>
-      <!-- 在這裡加入了合約書的超連結 -->
       <p class="hint">
-        可多選；建議 PDF。<a href="https://your-contract-link.com" target="_blank" rel="noopener">點此下載/查看合約書範本</a>。<br>
+        可多選；建議 PDF。<a href="https://drive.google.com/file/d/1NKykSBGkWMYxFBpQfA3T8BsSnCXziy81/view?usp=sharing" target="_blank" rel="noopener">點此下載/查看合約書範本</a>。<br>
         未滿 18 歲請加上「未成年合作法定代理人同意書」
       </p>
       <input id="contract" type="file" accept="image/*,application/pdf" multiple />
@@ -129,7 +128,6 @@
   </div>
 
   <script>
-    // 請在 LINE Developers 新增一個 LIFF，Endpoint 指到此頁網址，並填入 LIFF ID
     const LIFF_ID = "2012259104-vC0Ppjbm";
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyX0Aqq39sml4dIoYl3q9hsR_-SHkH-7wBQe_E3m-3XgMGAaFqpUu2KyT3IEXrnveEe0w/exec";
     const SECRET_TOKEN = "oshare-reg-2026-k9m2x7";
