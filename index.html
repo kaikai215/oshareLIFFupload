@@ -12,6 +12,7 @@
       --text: #674b39;
       --muted: #7a6b5c;
       --btn: #d8ccbe;
+      --link: #8c5d3b; /* 新增連結顏色 */
     }
     * { box-sizing: border-box; }
     body {
@@ -47,6 +48,11 @@
       font-size: 0.75rem;
       color: var(--muted);
       margin: -2px 0 8px;
+    }
+    .hint a {
+      color: var(--link);
+      font-weight: 600;
+      text-decoration: underline;
     }
     input[type="file"] {
       width: 100%;
@@ -99,7 +105,11 @@
 
     <div id="uploadForm" class="hidden">
       <label for="contract">合約／同意書（最多 3 個檔）</label>
-      <p class="hint">可多選；建議 PDF。未滿 18 歲請加上「未成年合作法定代理人同意書」</p>
+      <!-- 在這裡加入了合約書的超連結 -->
+      <p class="hint">
+        可多選；建議 PDF。<a href="https://your-contract-link.com" target="_blank" rel="noopener">點此下載/查看合約書範本</a>。<br>
+        未滿 18 歲請加上「未成年合作法定代理人同意書」
+      </p>
       <input id="contract" type="file" accept="image/*,application/pdf" multiple />
       <p class="hint" id="contractFileList"></p>
 
